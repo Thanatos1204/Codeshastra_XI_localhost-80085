@@ -181,12 +181,7 @@ export default function BaselinePage() {
               <h2 className="text-2xl font-bold mb-4">Initial Scan</h2>
               <p className="text-gray-400 mb-6">
                 Our AI system will perform a comprehensive scan of your space, creating a detailed 3D map and inventory of all objects and their positions.
-              </p>
-              <Button className="w-full bg-blue-600 hover:bg-blue-700 text-lg py-6 rounded-lg shadow-[0_0_15px_rgba(59,130,246,0.5)] hover:shadow-[0_0_30px_rgba(59,130,246,0.8)] transition-all duration-300">
-                Start Scan
-              </Button>
-                Our AI system will perform a comprehensive scan of your space, creating a detailed map of all objects and their positions.
-              
+              </p>           
               {/* Upload area */}
               <div className="mt-auto">
                 {!selectedImage ? (
