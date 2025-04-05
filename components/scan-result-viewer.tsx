@@ -48,7 +48,7 @@ export default function ScanResultViewer({ scanResult, activeTab }: ScanResultVi
 
   return (
     <div className="relative">
-      <TabsContent value="all" className="relative aspect-video rounded-lg overflow-hidden">
+      <TabsContent value="all" className="relative mb-6 h-auto w-full rounded-lg object-contain">
         {loading.all ? (
           <Skeleton className="w-full h-full absolute" />
         ) : null}
@@ -56,15 +56,15 @@ export default function ScanResultViewer({ scanResult, activeTab }: ScanResultVi
           <Image 
             src={`http://localhost:5000${scanResult.scans.all}`}
             alt="Combined scan result"
-            objectFit="contain"
-            width={1024}
-            height={1024}
-            className="rounded-lg w-full"
+            width={0}
+            height={0}
+            sizes="100vw"
+            className="w-auto h-auto max-w-full rounded-lg object-contain"
           />
         </div>
       </TabsContent>
 
-      <TabsContent value="edges" className="relative aspect-video rounded-lg overflow-hidden">
+      <TabsContent value="edges" className="relative mb-6 h-auto w-full rounded-lg object-contain">
         {loading.edges ? (
           <Skeleton className="w-full h-full absolute" />
         ) : null}
@@ -72,15 +72,15 @@ export default function ScanResultViewer({ scanResult, activeTab }: ScanResultVi
           <Image 
             src={`http://localhost:5000${scanResult.scans.edges}`}
             alt="Edge detection"
-            objectFit="contain"
-            width={1024}
-            height={1024}
-            className="rounded-lg w-full"
+            width={0}
+            height={0}
+            sizes="100vw"
+            className="w-auto h-auto max-w-full rounded-lg object-contain"
           />
         </div>
       </TabsContent>
 
-      <TabsContent value="depth" className="relative aspect-video rounded-lg overflow-hidden">
+      <TabsContent value="depth" className="relative mb-6 h-auto w-full rounded-lg object-contain">
         {loading.depth ? (
           <Skeleton className="w-full h-full absolute" />
         ) : null}
@@ -88,15 +88,15 @@ export default function ScanResultViewer({ scanResult, activeTab }: ScanResultVi
           <Image 
             src={`http://localhost:5000${scanResult.scans.depth_colored}`}
             alt="Depth map"
-            objectFit="contain"
-            width={1024}
-            height={1024}
-            className="rounded-lg w-full"
+            width={0}
+            height={0}
+            sizes="100vw"
+            className="w-auto h-auto max-w-full rounded-lg object-contain"
           />
         </div>
       </TabsContent>
 
-      <TabsContent value="corners" className="relative aspect-video rounded-lg overflow-hidden">
+      <TabsContent value="corners" className="relative mb-6 h-auto w-full rounded-lg object-contain">
         {loading.corners ? (
           <Skeleton className="w-full h-full absolute" />
         ) : null}
@@ -104,10 +104,10 @@ export default function ScanResultViewer({ scanResult, activeTab }: ScanResultVi
           <Image 
             src={`http://localhost:5000${scanResult.scans.corners}`}
             alt="Corner features"
-            width={1024}
-            height={1024}
-            objectFit="contain"
-            className="rounded-lg w-full"
+            width={0}
+            height={0}
+            sizes="100vw"
+            className="w-auto h-auto max-w-full rounded-lg object-contain"
           />
         </div>
       </TabsContent>

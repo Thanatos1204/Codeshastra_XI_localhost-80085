@@ -139,7 +139,7 @@ export default function BaselinePage() {
   }, [previewUrl])
 
   return (
-    <div className="min-h-screen bg-black text-white p-8">
+    <div className="min-h-screen bg-black text-white md:p-8 p-4">
       {/* Header with back button */}
       <div className="max-w-7xl mx-auto mb-12">
         <Button
@@ -176,7 +176,7 @@ export default function BaselinePage() {
             transition={{ duration: 0.8, delay: 0.2 }}
             className="flex flex-col"
           >
-            <Card className="p-8 bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-gray-800 hover:border-gray-700 transition-all duration-300 h-full flex flex-col">
+            <Card className="md:p-8 p-4 bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-gray-800 hover:border-gray-700 transition-all duration-300 h-full flex flex-col">
               <div className="mb-6">
                 <Brain className="h-12 w-12 text-blue-500" />
               </div>
@@ -206,15 +206,17 @@ export default function BaselinePage() {
                     />
                   </div>
                 ) : (
-                  <div className="relative mb-6 aspect-video rounded-lg overflow-hidden">
+                  <div className="relative mb-6 h-auto w-full rounded-lg object-contain">
                     {/* Image preview */}
                     {previewUrl && (
                       <Image 
                         src={previewUrl} 
                         alt="Room preview" 
-                        layout="fill"
                         objectFit="contain"
-                        className="rounded-lg"
+                        width={0}
+                        height={0}
+                        sizes="100vw"
+                        className="w-auto h-auto max-w-full rounded-lg object-contain"
                       />
                     )}
                     
@@ -271,7 +273,7 @@ export default function BaselinePage() {
             transition={{ duration: 0.8, delay: 0.4 }}
           >
             <Card className={cn(
-              "p-8 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-gray-800 hover:border-gray-700 transition-all duration-300",
+              "md:p-8 p-4 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-gray-800 hover:border-gray-700 transition-all duration-300",
               !scanResult && "h-full flex flex-col"
             )}>
               {!scanResult ? (
@@ -304,12 +306,12 @@ export default function BaselinePage() {
                   </div>
                   
                   <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
-                    <TabsList className="grid grid-cols-4 mb-4">
-                      <TabsTrigger value="all">Combined</TabsTrigger>
-                      <TabsTrigger value="edges">Edges</TabsTrigger>
-                      <TabsTrigger value="depth">Depth</TabsTrigger>
-                      <TabsTrigger value="corners">Features</TabsTrigger>
-                    </TabsList>
+                  <TabsList className="grid  grid-cols-4 gap-2 mb-4 ">
+  <TabsTrigger value="all">Combined</TabsTrigger>
+  <TabsTrigger value="edges">Edges</TabsTrigger>
+  <TabsTrigger value="depth">Depth</TabsTrigger>
+  <TabsTrigger value="corners">Features</TabsTrigger>
+</TabsList>
                     
                     <ScanResultViewer scanResult={scanResult} activeTab={activeTab} />
                   </Tabs>
