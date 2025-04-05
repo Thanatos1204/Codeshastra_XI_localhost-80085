@@ -1,16 +1,10 @@
 "use client"
-
-import { motion } from "framer-motion"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Brain, ScanLine, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { useState, useRef, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Brain, ScanLine, ArrowLeft, Upload, Image as ImageIcon, RefreshCw } from "lucide-react"
-import Link from "next/link"
 import Image from "next/image"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
@@ -180,9 +174,6 @@ export default function BaselinePage() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
           >
-            <Card className="p-8 bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-gray-800 hover:border-gray-700 transition-all duration-300">
-            className="flex flex-col"
-          >
             <Card className="md:p-8 p-4 bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-gray-800 hover:border-gray-700 transition-all duration-300 h-full flex flex-col">
               <div className="mb-6">
                 <Brain className="h-12 w-12 text-blue-500" />
@@ -195,7 +186,6 @@ export default function BaselinePage() {
                 Start Scan
               </Button>
                 Our AI system will perform a comprehensive scan of your space, creating a detailed map of all objects and their positions.
-              </p>
               
               {/* Upload area */}
               <div className="mt-auto">
@@ -284,21 +274,7 @@ export default function BaselinePage() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8, delay: 0.4 }}
           >
-            <Card className="p-8 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-gray-800 hover:border-gray-700 transition-all duration-300">
-              <div className="mb-6">
-                <ScanLine className="h-12 w-12 text-purple-500" />
-              </div>
-              <h2 className="text-2xl font-bold mb-4">Previous Scans</h2>
-              <p className="text-gray-400 mb-6">
-                View and manage your previous baseline scans. Compare different timestamps and track changes over time.
-              </p>
-              <Button className="w-full bg-purple-600 hover:bg-purple-700 text-lg py-6 rounded-lg shadow-[0_0_15px_rgba(147,51,234,0.5)] hover:shadow-[0_0_30px_rgba(147,51,234,0.8)] transition-all duration-300">
-                View History
-              </Button>
-            <Card className={cn(
-              "md:p-8 p-4 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-gray-800 hover:border-gray-700 transition-all duration-300",
-              !scanResult && "h-full flex flex-col"
-            )}>
+            <Card className={cn("md:p-8 p-4 bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-gray-800 hover:border-gray-700 transition-all duration-300",!scanResult && "h-full flex flex-col")}>
               {!scanResult ? (
                 <>
                   <div className="mb-6">
