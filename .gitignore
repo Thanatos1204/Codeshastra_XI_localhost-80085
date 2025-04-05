@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
@@ -14,6 +15,43 @@
 
 # production
 /build
+=======
+/env
+/backend/env/
+/backend/.env
+/backend/.envrc
+/backend/.env.local
+/backend/scan_storage
+backend/__pycache__/
+/.pytest_cache
+/.mypy_cache
+/.pytest_cache
+/.coverage
+/.coverage.*
+/.hypothesis/
+/.hypothesis/
+/env/
+/.env
+/.env
+/.envrc
+/.env.local
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+node_modules
+.pnp
+.pnp.js
+
+# testing
+coverage
+
+# next.js
+.next/
+out/
+
+# production
+build
+>>>>>>> origin/backend+frontend
 
 # misc
 .DS_Store
@@ -29,7 +67,17 @@ yarn-error.log*
 
 # vercel
 .vercel
+<<<<<<< HEAD
 .bolt/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+=======
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# custom
+.bolt/
+>>>>>>> origin/backend+frontend
