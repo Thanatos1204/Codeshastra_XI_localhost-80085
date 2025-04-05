@@ -1,6 +1,8 @@
-from flask import Flask, request, jsonify, send_file, make_response
+from flask import Flask, request, jsonify, send_file, make_response, Response
 import numpy as np
 import cv2
+from ultralytics import YOLO
+import time
 import os
 import io
 import uuid
@@ -9,6 +11,11 @@ import json
 from datetime import datetime
 import open3d as o3d
 from PIL import Image
+
+
+# Initialize YOLO model for object detection (if needed)
+model = YOLO("yolov8n.pt")
+
 
 class RoomBaselineScanner:
     def __init__(self, storage_path="scan_storage"):
@@ -19,6 +26,67 @@ class RoomBaselineScanner:
         os.makedirs(os.path.join(storage_path, "rooms"), exist_ok=True)
         os.makedirs(os.path.join(storage_path, "visualizations"), exist_ok=True)
         os.makedirs(os.path.join(storage_path, "pointclouds"), exist_ok=True)
+
+    def detect_objects(self, frame):
+        results = model(frame)[0]
+        detections = []
+        for box in results.boxes:
+            x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
+            cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+            detections.append({"bbox": [x1, y1, x2, y2], "centroid": [cx, cy]})
+        return detections
+
+    def compute_iou(self, boxA, boxB):
+        xA = max(boxA[0], boxB[0])
+        yA = max(boxA[1], boxB[1])
+        xB = min(boxA[2], boxB[2])
+        yB = min(boxA[3], boxB[3])
+        interArea = max(0, xB - xA) * max(0, yB - yA)
+        if interArea == 0:
+            return 0.0
+        boxAArea = (boxA[2]-boxA[0])*(boxA[3]-boxA[1])
+        boxBArea = (boxB[2]-boxB[0])*(boxB[3]-boxB[1])
+        return interArea / float(boxAArea + boxBArea - interArea)
+    
+    def compare_detections(self, old_dets, new_dets, iou_thresh=0.5, move_thresh=25):
+        added, removed, moved = [], [], []
+        matched_old, matched_new = set(), set()
+        for i, new_obj in enumerate(new_dets):
+            best_score, best_match = 0, -1
+            for j, old_obj in enumerate(old_dets):
+                iou = self.compute_iou(new_obj["bbox"], old_obj["bbox"])
+                dist = np.linalg.norm(np.array(new_obj["centroid"]) - np.array(old_obj["centroid"]))
+                score = iou - (dist / 300)
+                if score > best_score:
+                    best_score = score
+                    best_match = j
+            if best_score > 0.3:
+                matched_old.add(best_match)
+                matched_new.add(i)
+                dist = np.linalg.norm(np.array(new_obj["centroid"]) - np.array(old_dets[best_match]["centroid"]))
+                if dist > move_thresh:
+                    moved.append(new_obj)
+            else:
+                added.append(new_obj)
+        for j, old_obj in enumerate(old_dets):
+            if j not in matched_old:
+                removed.append(old_obj)
+        return added, removed, moved
+
+    def draw_differences(self, frame, added, removed, moved):
+        for obj in added:
+            x1, y1, x2, y2 = obj["bbox"]
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.putText(frame, "Added", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+        for obj in removed:
+            x1, y1, x2, y2 = obj["bbox"]
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+            cv2.putText(frame, "Removed", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+        for obj in moved:
+            x1, y1, x2, y2 = obj["bbox"]
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 0), 2)
+            cv2.putText(frame, "Moved", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+        return frame
         
     def process_image(self, image_path, room_id=None):
         """
@@ -400,6 +468,7 @@ class RoomBaselineScanner:
 # Create Flask API
 app = Flask(__name__)
 scanner = RoomBaselineScanner()
+stream_active = False
 
 # Enable CORS
 @app.after_request
@@ -417,6 +486,62 @@ def health_check():
         'version': '1.0.0',
         'timestamp': datetime.now().isoformat()
     })
+
+@app.route('/api/live-feed', methods=['GET'])
+def live_feed():
+    global stream_active
+    stream_active = True 
+    def generate():
+        global stream_active
+        cap = cv2.VideoCapture(0)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        prev_detections = []
+        
+        try:
+            while stream_active:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+
+                detections = scanner.detect_objects(frame)
+                added, removed, moved = scanner.compare_detections(prev_detections, detections)
+                frame = scanner.draw_differences(frame, added, removed, moved)
+
+                msg = f"Added: {len(added)} | Removed: {len(removed)} | Moved: {len(moved)}"
+                cv2.putText(frame, msg, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+                ret, buffer = cv2.imencode('.jpg', frame)
+                if not ret:
+                    break
+
+                frame_bytes = buffer.tobytes()
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+
+                prev_detections = detections
+                time.sleep(0.03)
+
+        except GeneratorExit:
+            print("Client disconnected.")
+        except Exception as e:
+            print(f"Stream error: {e}")
+        finally:
+            cap.release()
+            print("Camera released.")
+
+    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/api/stop-stream', methods=['POST'])
+def stop_stream():
+    global stream_active
+    stream_active = False
+    return jsonify({'status': 'stopped', 'message': 'Live stream has been stopped.'})
+
+@app.route('/api/stream-status', methods=['GET'])
+def stream_status():
+    return jsonify({'stream_active': stream_active})
+
 
 @app.route('/api/rooms', methods=['GET'])
 def get_rooms():
