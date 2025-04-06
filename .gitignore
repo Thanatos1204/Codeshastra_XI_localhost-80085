@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
@@ -15,8 +14,8 @@
 
 # production
 /build
-=======
 /env
+/backend/venv/
 /backend/env/
 /backend/.env
 /backend/.envrc
@@ -51,7 +50,6 @@ out/
 
 # production
 build
->>>>>>> origin/backend+frontend
 
 # misc
 .DS_Store

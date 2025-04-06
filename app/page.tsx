@@ -47,7 +47,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Hero Section with BackgroundLines */}
-      <BackgroundLines className="relative h-screen flex items-center justify-center overflow-hidden">
+      <BackgroundLines className="relative h-screen bg-black flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-blue-500/10 via-purple-500/10 to-pink-500/10" />
         <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
           <motion.h1
@@ -86,7 +86,7 @@ export default function Home() {
               asChild
               className="bg-purple-600 hover:bg-purple-700 text-white font-semibold text-lg px-8 py-6 rounded-full shadow-[0_4px_20px_rgba(147,51,234,0.6)] hover:shadow-[0_8px_25px_rgba(147,51,234,0.8)] transition-all duration-300 transform hover:-translate-y-1 hover:scale-105 relative overflow-hidden group"
             >
-              <Link href="/livefeed" className="flex items-center justify-center">
+              <Link href="/live-feed" className="flex items-center justify-center">
                 <span className="relative z-10">Live Feed Mode</span>
                 <span className="absolute inset-0 bg-gradient-to-r from-purple-500 to-purple-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
               </Link>
