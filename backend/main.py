@@ -16,6 +16,25 @@ from PIL import Image
 # Initialize YOLO model for object detection (if needed)
 model = YOLO("yolov8n.pt")
 
+# Define function to check for critical alerts based on removed objects
+def check_critical_alerts(room_id, removed_objects):
+    """Checks removed objects against stored critical objects for this room"""
+    critical_removed = []
+    
+    try:
+        with open("critical_objects.json", "r") as f:
+            critical_data = json.load(f)
+        
+        for obj in removed_objects:
+            obj_id = obj.get("removed_object_id")
+            if obj_id and any(c["id"] == obj_id and c["isCritical"] for c in critical_data):
+                critical_removed.append(obj_id)
+    
+    except Exception as e:
+        print(f"Failed to check critical alerts: {e}")
+    
+    return critical_removed
+
 
 class RoomBaselineScanner:
     def __init__(self, storage_path="scan_storage"):
@@ -681,19 +700,43 @@ def create_room_scan():
         scanner.save_visualization(all_vis, f"{room_id}_all.png")
         
         # Create response with image URLs
+        # Get object detection results from the original image
+        results = model(image)[0]
+        boxes = []
+        
+        # Format detection results for frontend
+        for i, box in enumerate(results.boxes):
+            x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
+            confidence = float(box.conf[0])
+            class_id = int(box.cls[0])
+            label = results.names[class_id]
+            
+            boxes.append({
+                'id': f"{room_id}_obj_{i}",  # Unique ID for each detected object
+                'label': f"{label} ({confidence:.2f})",
+                'bbox': [x1, y1, x2, y2]
+            })
+            room_dir = os.path.join(scanner.storage_path, "rooms", room_id)
+            os.makedirs(room_dir, exist_ok=True)
+            # Save boxes with IDs to JSON file
+            with open(os.path.join(room_dir, "original_boxes.json"), "w") as f:
+                json.dump(boxes, f)
+        
         response = {
             'status': 'success',
             'room_id': room_id,
             'message': 'Room scan created successfully',
             'timestamp': scan_data['timestamp'],
+            'boxes': boxes,
+            'original_image_url': f"/api/rooms/{room_id}/original",
             'scans': {
-                'original': f"/api/rooms/{room_id}/original",
-                'edges': f"/api/rooms/{room_id}/edges",
-                'depth': f"/api/rooms/{room_id}/depth",
-                'depth_colored': f"/api/rooms/{room_id}/depth_colored",
-                'corners': f"/api/rooms/{room_id}/corners",
-                'lines': f"/api/rooms/{room_id}/lines",
-                'all': f"/api/rooms/{room_id}/all"
+            'original': f"/api/rooms/{room_id}/original",
+            'edges': f"/api/rooms/{room_id}/edges",
+            'depth': f"/api/rooms/{room_id}/depth",
+            'depth_colored': f"/api/rooms/{room_id}/depth_colored",
+            'corners': f"/api/rooms/{room_id}/corners",
+            'lines': f"/api/rooms/{room_id}/lines",
+            'all': f"/api/rooms/{room_id}/all"
             }
         }
         
@@ -730,36 +773,32 @@ def compare_room_scans():
     if not os.path.exists(os.path.join(scanner.storage_path, "rooms", room_id)):
         return jsonify({'error': f'No baseline scan found for room {room_id}'}), 404
     
-    # Load baseline scan
-    baseline_scan = scanner._load_scan_data(room_id)
-    
-    # Read current image
-    img_array = np.frombuffer(image_file.read(), np.uint8)
-    current_image = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-    
-    if current_image is None:
-        return jsonify({'error': 'Invalid image file'}), 400
-    
     try:
+        # Load baseline scan
+        baseline_scan = scanner._load_scan_data(room_id)
+        
+        # Read uploaded image
+        img_array = np.frombuffer(image_file.read(), np.uint8)
+        current_image = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+        
+        if current_image is None:
+            return jsonify({'error': 'Invalid image file'}), 400
+            
         # Process current image
         current_scan = scanner.process_image(current_image)
         
-        # Compare scans
+        # Generate comparison visualization
         comparison_img, diff_metrics = scanner.compare_scans(baseline_scan, current_scan)
+        comparison_id = f"{room_id}_{int(time.time())}"
+        scanner.save_visualization(comparison_img, f"{comparison_id}_comparison.png")
         
-        # Generate a unique ID for this comparison
-        comparison_id = f"{room_id}_{int(datetime.now().timestamp())}"
-        
-        # Save comparison visualization
-        comparison_path = scanner.save_visualization(comparison_img, f"{comparison_id}_comparison.png")
-        
-        # Create response
+        # Create response with comparison results
         response = {
             'status': 'success',
             'room_id': room_id,
             'comparison_id': comparison_id,
-            'metrics': diff_metrics,
-            'comparison_url': f"/api/comparisons/{comparison_id}"
+            'comparison_url': f"/api/comparisons/{comparison_id}",
+            'metrics': diff_metrics
         }
         
         # Include base64 encoded comparison in response if requested
@@ -767,8 +806,50 @@ def compare_room_scans():
         if include_images:
             response['comparison_image'] = scanner.image_to_base64(comparison_img)
         
+        # Detect objects in both images
+        base_dets = scanner.detect_objects(baseline_scan['original_image'])
+        curr_dets = scanner.detect_objects(current_image)
+        added, removed, moved = scanner.compare_detections(base_dets, curr_dets)
+
+        # Assign consistent removed object IDs
+        removed_with_ids = []
+        for i, obj in enumerate(removed):
+            bbox = obj.get("bbox")
+            obj_with_details = obj.copy()  # Start with existing properties
+            
+            # Try to match with original boxes to get complete details
+            if bbox:
+                room_boxes_path = os.path.join(scanner.storage_path, "rooms", room_id, "original_boxes.json")
+                if os.path.exists(room_boxes_path):
+                    with open(room_boxes_path, "r") as f:
+                        room_boxes = json.load(f)
+                        #print("Room Boxes:", room_boxes)
+                        for b in room_boxes:
+                            print("Checking box:", b)
+                            print("Against bbox:", bbox)
+                            if b["bbox"] == bbox:
+                                print("Matching box found:", b)
+                                # Add all details from the original box
+                                obj_with_details["removed_object_id"] = b["id"]
+                                obj_with_details["label"] = b["label"]
+                                obj_with_details["bbox"] = b["bbox"]
+                                break
+            
+            removed_with_ids.append(obj_with_details)
+
+        # Add object changes to response
+        response["changes"] = {
+            "added": added,
+            "removed": removed_with_ids,
+            "moved": moved
+        }
+        
+        # Check for critical alerts
+        critical_removed = check_critical_alerts(room_id, removed_with_ids)
+        response["critical_alerts"] = critical_removed
+        
         return jsonify(response)
-    
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

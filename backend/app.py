@@ -10,18 +10,84 @@ from io import BytesIO
 from scipy.optimize import linear_sum_assignment
 import os
 import base64
-import json
 from flask_cors import CORS
+import json
+from pathlib import Path
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE')
+    return response
 # Load models
 model = YOLO('yolov8l.pt')
 clip_model, _, clip_preprocess = open_clip.create_model_and_transforms('ViT-B-32', pretrained='laion2b_s34b_b79k')
 clip_model.eval()
 clip_tokenizer = open_clip.get_tokenizer('ViT-B-32')
 
+CRITICAL_JSON_PATH = "critical_objects.json"
+
 # Utility Functions
+# Load critical objects
+def load_critical_objects():
+    if not os.path.exists(CRITICAL_JSON_PATH):
+        return {}
+    with open(CRITICAL_JSON_PATH, "r") as f:
+        return json.load(f)
+
+# Save critical objects
+def save_critical_objects(data):
+    with open(CRITICAL_JSON_PATH, "w") as f:
+        json.dump(data, f, indent=2)
+
+
+
+
+def check_critical_alerts(room_id, added, removed, moved):
+    critical_path = Path("critical_objects.json")
+    print("Critical Path:", critical_path)
+    if not critical_path.exists():
+        return []
+
+    with open(critical_path, "r") as f:
+        critical_objects = json.load(f)
+
+    alerts = []
+    for obj in critical_objects:
+        if obj["isCritical"]:
+            #print("Checking object:", obj)
+            print("removed:", removed)
+            print("OBJECT ID:", obj["id"])
+            if obj["id"] in removed:
+                print("Removed object:", obj)
+                alerts.append({
+                    "id": obj["id"],
+                    "tag": obj["tag"],
+                    "type": "REMOVED",
+                    "message": f"⚠️ Critical object '{obj['tag']}' was removed."
+                })
+            elif obj["id"] in moved:
+                alerts.append({
+                    "id": obj["id"],
+                    "tag": obj["tag"],
+                    "type": "MOVED",
+                    "message": f"⚠️ Critical object '{obj['tag']}' was moved."
+                })
+            elif obj["id"] in added:
+                alerts.append({
+                    "id": obj["id"],
+                    "tag": obj["tag"],
+                    "type": "ADDED",
+                    "message": f"⚠️ Critical object '{obj['tag']}' was newly added."
+                })
+
+    return alerts
+
+
+
+
 def get_clip_embedding(image):
     image = Image.fromarray(image)
     image = clip_preprocess(image).unsqueeze(0)
@@ -91,7 +157,7 @@ def compute_iou(boxA, boxB):
     areaB = (boxB[2] - boxB[0]) * (boxB[3] - boxB[1])
     return interArea / float(areaA + areaB - interArea)
 
-def match_detections(old_dets, new_dets):
+def match_detections(room_id, boxes, old_dets, new_dets):
     if not old_dets or not new_dets:
         return new_dets, old_dets, []
     cost_matrix = np.zeros((len(old_dets), len(new_dets)))
@@ -141,6 +207,13 @@ def draw_differences(image, added, removed, moved):
 def compare_images():
     if "base" not in request.files or "current" not in request.files:
         return jsonify({"error": "Both 'base' and 'current' image files are required"}), 400
+    # Extract room_id from form data
+    room_id = request.form.get("room_id", "unknown")
+    scan_result = request.form.get("scan-result")
+    scan_results = json.loads(scan_result)
+    #print("Scan Result:", scan_result)
+    boxes = scan_results["boxes"]
+    print("Boxes:", boxes)
 
     base_img = cv2.imdecode(np.frombuffer(request.files["base"].read(), np.uint8), 1)
     curr_img = cv2.imdecode(np.frombuffer(request.files["current"].read(), np.uint8), 1)
@@ -151,12 +224,26 @@ def compare_images():
     base_dets = detect_objects(base_img)
     curr_dets = detect_objects(curr_img)
 
-    added, removed, moved = match_detections(base_dets, curr_dets)
+    added, removed, moved = match_detections(room_id, boxes, base_dets, curr_dets)
 
     annotated = draw_differences(curr_img, added, removed, moved)
     _, buffer = cv2.imencode(".jpg", annotated)
     encoded_image = base64.b64encode(buffer).decode("utf-8")
     base64_url = f"data:image/jpeg;base64,{encoded_image}"
+
+    
+    print("Removed:", removed)
+    # Extract IDs from detected objects
+    added_ids = [obj.get("id", i) for i, obj in enumerate(added)]
+    removed_ids = request.form.getlist("removed_ids")
+    moved_ids = [obj.get("id", i) for i, obj in enumerate(moved)]
+    print("Added IDs:", added_ids)
+    print("Removed IDs:", removed_ids)
+    print("Moved IDs:", moved_ids)
+    # Check for critical alerts
+    alerts = check_critical_alerts(room_id, added_ids, removed_ids, moved_ids)
+    print("Critical Alerts:", alerts)
+    
 
     stats = {
         "total_in_base": len(base_dets),
@@ -167,12 +254,28 @@ def compare_images():
         "total_moved": len(moved),
         "increase_in_objects": len(curr_dets) - len(base_dets),
         "decrease_in_objects": len(base_dets) - len(curr_dets),
+        "critical_alerts": alerts,
     }
 
     return jsonify({
         "image_base64": base64_url,
         "stats": stats
     })
+
+@app.route('/save_critical', methods=['POST'])
+def save_critical_objects():
+    data = request.get_json()
+    room_id = data.get("room_id")
+    objects = data.get("objects", [])
+
+    if not room_id or not objects:
+        return jsonify({"error": "Invalid payload"}), 400
+
+    with open(os.path.join("critical_objects.json"), "w") as f:
+        json.dump(objects, f)
+
+    return jsonify({"status": "success", "message": "Critical objects saved"})
+
 
 @app.route("/compare/json", methods=["POST"])
 def compare_json_only():

@@ -1,17 +1,19 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
-import { motion } from "framer-motion"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Brain, ScanLine, ArrowLeft, Upload, Image as ImageIcon, RefreshCw } from "lucide-react"
-import Link from "next/link"
-import Image from "next/image"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { cn } from "@/lib/utils"
-import { RoomScanResult } from "@/types/scan"
-import ScanResultViewer from "@/components/scan-result-viewer"
-import PreviousScansModal from "@/components/previous-scans-modal"
+import { useState, useRef, useEffect } from "react";
+import { motion } from "framer-motion";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Brain, ScanLine, ArrowLeft, Upload, Image as ImageIcon, RefreshCw } from "lucide-react";
+import Link from "next/link";
+import Image from "next/image";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
+import { RoomScanResult } from "@/types/scan";
+import ScanResultViewer from "@/components/scan-result-viewer";
+import PreviousScansModal from "@/components/previous-scans-modal";
+import CriticalObjectSelectorModal from "@/components/CriticalObjectSelectorModal";
+
 
 export default function BaselinePage() {
   // State for the scan process
@@ -23,6 +25,7 @@ export default function BaselinePage() {
   const [nextSelectedImage, setNextSelectedImage] = useState<File | null>(null)
   const [nextPreviewUrl, setNextPreviewUrl] = useState<string | null>(null)
   const [isScanningNext, setNextIsScanning] = useState(false)
+  const [showTaggingModal, setShowTaggingModal] = useState(false);
   const [nextScanResult, setNextScanResult] = useState<RoomScanResult | null>(null)
   
   const [activeTab, setActiveTab] = useState<string>("original")
@@ -44,6 +47,10 @@ export default function BaselinePage() {
       total_moved: number;
       increase_in_objects: number;
       decrease_in_objects: number;
+      alerts: {
+        type: string;
+        message: string;
+      }[];
     } | null;
   } | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
@@ -56,6 +63,9 @@ export default function BaselinePage() {
     
     try {
       const formData = new FormData();
+      formData.append('room_id', scanResult?.room_id || '');
+      formData.append('scan-result', scanResult ? JSON.stringify(scanResult) : '[]');
+      formData.append('removed_ids', comparisonResult?.changes.removed[0].removed_object_id || []);
       formData.append('base', selectedImage);
       formData.append('current', nextSelectedImage);
       
@@ -247,6 +257,7 @@ export default function BaselinePage() {
   
       const result = await response.json()
       setComparisonResult(result)
+      console.log('Comparison result:', result)
     } catch (error) {
       console.error('Comparison error:', error)
       setComparisonError(error instanceof Error ? error.message : 'An unknown error occurred')
@@ -487,12 +498,30 @@ export default function BaselinePage() {
                 >
                   {isUploading ? "Processing..." : "Take Next Scan"}
                 </Button>
+                <Button
+                  className="w-full bg-yellow-600 hover:bg-yellow-700 text-lg py-3 mt-4 rounded-lg"
+                  onClick={() => setShowTaggingModal(true)}
+                >
+                  Tag Critical Objects
+                </Button>
+
                 </div>
               )}
             </Card>
           </motion.div>
         </div>
       </div>
+
+      {scanResult && (
+        <CriticalObjectSelectorModal
+          isOpen={showTaggingModal}
+          onClose={() => setShowTaggingModal(false)}
+          imageUrl={`http://localhost:5000${scanResult.original_image_url}`}
+          boxes={scanResult.boxes}
+          roomId={scanResult.room_id}
+        />
+      )}
+
       
       {/* Previous scans modal */}
       <PreviousScansModal 
@@ -720,7 +749,13 @@ export default function BaselinePage() {
                           {detailsData.stats && Object.entries(detailsData.stats).map(([key, value]) => (
                             <div key={key} className="bg-gray-900/50 rounded p-3">
                               <p className="text-sm text-gray-400">{key.replace(/_/g, ' ')}:</p>
-                              <p className="text-lg font-medium text-white">{value}</p>
+                              <p className="text-lg font-medium text-white">
+                                {Array.isArray(value) 
+                                  ? value.map((alert, idx) => (
+                                      <span key={idx} className="block mb-1">{alert.message}</span>
+                                    ))
+                                  : String(value)}
+                              </p>
                             </div>
                           ))}
                         </div>
@@ -738,11 +773,6 @@ export default function BaselinePage() {
                   </motion.div>
                 </dialog>
               )}
-
-              
-      
-    
-
     </div>
   )
 }

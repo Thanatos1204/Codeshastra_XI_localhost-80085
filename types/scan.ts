@@ -3,6 +3,12 @@ export interface RoomScanResult {
     room_id: string;
     message?: string;
     timestamp: string;
+    boxes: {
+        id: string;
+        label: string;
+        bbox: [number, number, number, number];
+        }[];
+    original_image_url: string;
     scans: {
       original: string;
       edges: string;

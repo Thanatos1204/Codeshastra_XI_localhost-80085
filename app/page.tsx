@@ -47,7 +47,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Hero Section with BackgroundLines */}
-      <BackgroundLines className="relative h-screen flex items-center justify-center overflow-hidden">
+      <BackgroundLines className="relative h-screen bg-black flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-blue-500/10 via-purple-500/10 to-pink-500/10" />
         <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
           <motion.h1
